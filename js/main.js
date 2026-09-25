@@ -46,6 +46,17 @@
         return '<g transform="rotate(' + p[1] + ' 100 100)"><path class="petal ' + p[0] + '" d="' + LEAF + '" fill="' + p[2] + '" fill-opacity=".92"/></g>';
       }).join("") + "</svg>";
   }
+  // Logo do hero: pétalas desenhadas em traço, preenchidas e depois "batendo" como um coração
+  function heroMark() {
+    return '<svg class="mark hero-mark" viewBox="-6 -6 212 212" aria-hidden="true">' +
+      '<circle class="hm-ripple" style="--r:0" cx="100" cy="100" r="30"/><circle class="hm-ripple" style="--r:1" cx="100" cy="100" r="30"/>' +
+      PETALS.map(function (p, i) {
+        return '<g transform="rotate(' + p[1] + ' 100 100)"><g class="hm-petal" style="--k:' + i + '">' +
+          '<path class="petal hm-fill" d="' + LEAF + '" fill="' + p[2] + '" fill-opacity=".92"/>' +
+          '<path class="hm-line" d="' + LEAF + '" stroke="' + p[2] + '" pathLength="1"/></g></g>';
+      }).join("") +
+      '<circle class="hm-core" cx="100" cy="100" r="7"/></svg>';
+  }
 
   function esc(s) {
     return String(s == null ? "" : s).replace(/[&<>"']/g, function (c) {
@@ -112,6 +123,7 @@
       '<a class="wa-float" href="' + waLink(atual ? atual.nome : "") + '" target="_blank" rel="noopener" aria-label="Conversar no WhatsApp">' + icon("whatsapp") + "</a>";
 
     var mnav = $(".mobile-nav"), tgl = $(".menu-toggle");
+    $$("a", mnav).forEach(function (a, i) { a.style.setProperty("--i", i); });
     function setMenu(open) {
       mnav.classList.toggle("open", open);
       mnav.setAttribute("aria-hidden", String(!open));
@@ -148,7 +160,15 @@
   }
 
   function renderHome() {
-    $("#hero-art").innerHTML = mark("animate") + (D.imagens.hero ? '<div class="hero-photo"><img src="' + img(D.imagens.hero) + '" alt="Aluna da Evolution em aula prática"></div>' : "");
+    var abertas = D.cursos.filter(function (c) { return c.status === "aberta"; }).length;
+    $("#hero-art").innerHTML =
+      '<div class="mark-wrap">' + heroMark() + "</div>" +
+      (D.imagens.hero ? '<div class="hero-photo"><img src="' + img(D.imagens.hero) + '" alt="Aluna da Evolution em aula prática"></div>' : "") +
+      '<div class="hero-stats" aria-hidden="true">' +
+      '<div class="hs-item"><span class="hs-ic">' + icon("certificado") + "</span><strong>+" + C.formados.toLocaleString("pt-BR") + "</strong><small>alunos formados</small></div>" +
+      (abertas ? '<div class="hs-item hs-live"><span class="hs-ic"><i></i></span><strong>' + abertas + "</strong><small>" + (abertas > 1 ? "turmas abertas" : "turma aberta") + "</small></div>" : "") +
+      '<div class="hs-item"><span class="hs-ic">' + icon("estetoscopio") + "</span><strong>Prática</strong><small>laboratório e estágio</small></div>" +
+      "</div>";
 
     $("#f-formados").textContent = C.formados.toLocaleString("pt-BR");
     $("#f-cursos").textContent = D.cursos.length;
@@ -165,11 +185,31 @@
       b.addEventListener("click", function () {
         $$(".filter").forEach(function (x) { x.classList.remove("active"); x.setAttribute("aria-pressed", "false"); });
         b.classList.add("active"); b.setAttribute("aria-pressed", "true");
+        var n = 0;
         $$(".course-row", list).forEach(function (r) {
-          r.classList.toggle("hidden", b.dataset.filter !== "todos" && r.dataset.tipo !== b.dataset.filter);
+          var hide = b.dataset.filter !== "todos" && r.dataset.tipo !== b.dataset.filter;
+          r.classList.toggle("hidden", hide);
+          r.classList.remove("pop");
+          if (!hide) { void r.offsetWidth; r.style.setProperty("--d", n++); r.classList.add("pop"); }
         });
+        moveInd();
       });
     });
+    var fl = $(".filters"), ind = document.createElement("span");
+    ind.className = "filter-ind";
+    fl.insertBefore(ind, fl.firstChild);
+    fl.classList.add("has-ind");
+    function moveInd() {
+      var a = $(".filter.active", fl);
+      if (!a) return;
+      ind.style.width = a.offsetWidth + "px";
+      ind.style.height = a.offsetHeight + "px";
+      ind.style.transform = "translate(" + a.offsetLeft + "px," + a.offsetTop + "px)";
+    }
+    moveInd();
+    requestAnimationFrame(function () { ind.classList.add("ready"); });
+    if (document.fonts && document.fonts.ready) document.fonts.ready.then(moveInd);
+    window.addEventListener("resize", moveInd);
 
     if (D.promocao && D.promocao.ativa) {
       var pc = cursoPorSlug(D.promocao.curso);
@@ -202,8 +242,10 @@
     }).join("");
 
     $("#faq").innerHTML = D.faq.map(function (f) {
-      return "<details><summary>" + esc(f.p) + '<span class="pm" aria-hidden="true"></span></summary><p>' + esc(f.r) + "</p></details>";
+      return "<details><summary>" + esc(f.p) + '<span class="pm" aria-hidden="true"></span></summary><div class="ans"><p>' + esc(f.r) + "</p></div></details>";
     }).join("");
+
+    accordion($$("#faq details"));
 
     $("#contact-list").innerHTML =
       '<li><a href="' + waLink() + '" target="_blank" rel="noopener"><span class="ic wa">' + icon("whatsapp") + "</span><span><small>WhatsApp</small><strong>" + esc(C.whatsappExibicao) + "</strong></span></a></li>" +
@@ -238,6 +280,8 @@
       var g = items[cur];
       $(".lb-media", lb).innerHTML = g.imagem ? '<img src="' + img(g.imagem) + '" alt="' + esc(g.titulo) + '">' : '<div class="lb-empty">' + icon(g.icone || "camera") + "</div>";
       $(".lightbox-cap", lb).textContent = g.titulo;
+      var m = $(".lb-media", lb);
+      m.classList.remove("swap"); void m.offsetWidth; m.classList.add("swap");
     }
     function close() { lb.classList.remove("open"); body.style.overflow = ""; if (opener) opener.focus(); }
     container.addEventListener("click", function (e) {
@@ -281,7 +325,7 @@
       : '<small>Valores</small><strong class="ask">Sob consulta</strong><span class="det">Pergunte pela condição do mês no WhatsApp</span>';
 
     main.innerHTML =
-      '<section class="course-hero"><div class="wrap">' +
+      '<section class="course-hero"><div class="hero-grid" aria-hidden="true"></div><div class="wrap">' +
       '<nav class="crumbs" aria-label="Você está em"><a href="' + BASE + 'index.html">Início</a> / <a href="' + BASE + 'index.html#cursos">Cursos</a> / ' + esc(c.nome) + "</nav>" +
       '<div class="text"><div class="tags"><span class="kind">' + TIPOS[c.tipo] + '</span><span class="status ' + c.status + '">' + STATUS[c.status] + "</span>" +
       (c.promocao ? '<span class="promo-chip">' + esc(c.promocao) + "</span>" : "") + "</div>" +
@@ -289,7 +333,7 @@
       '<p class="lead">' + esc(c.frase) + "</p>" +
       '<div class="hero-actions"><a class="btn btn-go" href="' + waLink(c.nome) + '" target="_blank" rel="noopener">' + icon("whatsapp") + "Quero me matricular</a>" +
       '<a class="btn btn-line" href="#detalhes">Ver detalhes</a></div></div>' +
-      '<div class="big-ic">' + icon(c.icone) + "</div>" +
+      '<div class="big-ic">' + icon(c.icone, ' class="draw"') + "</div>" +
       "</div></section>" +
 
       '<div class="wrap course-body" id="detalhes"><div>' +
@@ -323,7 +367,194 @@
       '<a class="btn btn-go btn-sm" href="' + waLink(c.nome) + '" target="_blank" rel="noopener">' + icon("whatsapp") + "Quero me matricular</a></div>";
   }
 
+  var REDUCE = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  var FINE = window.matchMedia && window.matchMedia("(hover: hover) and (pointer: fine)").matches;
+
+  function accordion(items) {
+    items.forEach(function (d) {
+      var sum = $("summary", d), ans = $(".ans", d), anim = null;
+      sum.addEventListener("click", function (e) {
+        if (REDUCE || !ans.animate) return;
+        e.preventDefault();
+        if (anim) anim.cancel();
+        var closing = d.open;
+        var from = closing ? ans.offsetHeight : 0;
+        if (!closing) d.open = true;
+        var to = closing ? 0 : ans.scrollHeight;
+        anim = ans.animate(
+          [{ height: from + "px", opacity: closing ? 1 : 0 }, { height: to + "px", opacity: closing ? 0 : 1 }],
+          { duration: 420, easing: "cubic-bezier(.16,1,.3,1)" }
+        );
+        anim.onfinish = function () { anim = null; if (closing) d.open = false; };
+      });
+    });
+  }
+
+  function splitWords(el) {
+    var i = 0, frag = document.createDocumentFragment();
+    function word(node) {
+      var w = document.createElement("span"), inner = document.createElement("span");
+      w.className = "w";
+      inner.style.setProperty("--i", i++);
+      inner.appendChild(node);
+      w.appendChild(inner);
+      return w;
+    }
+    Array.prototype.slice.call(el.childNodes).forEach(function (n) {
+      if (n.nodeType !== 3) { frag.appendChild(word(n)); return; }
+      n.textContent.split(/(\s+)/).forEach(function (part) {
+        if (!part) return;
+        frag.appendChild(/^\s+$/.test(part) ? document.createTextNode(" ") : word(document.createTextNode(part)));
+      });
+    });
+    el.textContent = "";
+    el.appendChild(frag);
+    el.classList.add("split");
+  }
+
+  function countUp(el, to) {
+    var t0 = null, dur = 1800;
+    function step(t) {
+      if (!t0) t0 = t;
+      var p = Math.min((t - t0) / dur, 1);
+      el.textContent = Math.round(to * (1 - Math.pow(1 - p, 4))).toLocaleString("pt-BR");
+      if (p < 1) requestAnimationFrame(step);
+    }
+    requestAnimationFrame(step);
+  }
+
+  function motion() {
+    $$("svg.draw").forEach(function (svg) {
+      $$("path, circle, rect, line, polyline", svg).forEach(function (n) { n.setAttribute("pathLength", "1"); });
+    });
+
+    var bar = document.createElement("div");
+    bar.className = "scroll-progress";
+    bar.setAttribute("aria-hidden", "true");
+    body.appendChild(bar);
+    var ticking = false;
+    function progress() {
+      ticking = false;
+      var max = document.documentElement.scrollHeight - window.innerHeight;
+      bar.style.setProperty("--p", max > 0 ? Math.min(window.scrollY / max, 1) : 0);
+    }
+    window.addEventListener("scroll", function () { if (!ticking) { ticking = true; requestAnimationFrame(progress); } }, { passive: true });
+    progress();
+
+    // Destaca no menu a seção visível
+    var navLinks = $$(".nav a").filter(function (a) { return a.getAttribute("href").charAt(0) === "#"; });
+    if (navLinks.length && "IntersectionObserver" in window) {
+      var spy = new IntersectionObserver(function (entries) {
+        entries.forEach(function (en) {
+          if (!en.isIntersecting) return;
+          navLinks.forEach(function (a) { a.classList.toggle("active", a.getAttribute("href") === "#" + en.target.id); });
+        });
+      }, { rootMargin: "-45% 0px -50% 0px" });
+      $$("main section[id]").forEach(function (t) { spy.observe(t); });
+    }
+
+    if (REDUCE || !("IntersectionObserver" in window)) return;
+
+    $$(".hero h1, .course-hero h1").forEach(splitWords);
+
+    var formados = $("#f-formados");
+    if (formados) {
+      formados.textContent = "0";
+      $("#f-cursos").textContent = "0";
+      var fo = new IntersectionObserver(function (e) {
+        if (!e[0].isIntersecting) return;
+        fo.disconnect();
+        countUp(formados, C.formados);
+        countUp($("#f-cursos"), D.cursos.length);
+      }, { threshold: .4 });
+      fo.observe(formados.closest("section"));
+    }
+
+    document.documentElement.classList.add("js-motion");
+    var io = new IntersectionObserver(function (entries) {
+      entries.forEach(function (en) {
+        if (!en.isIntersecting && en.boundingClientRect.top > 0) return;
+        var el = en.target;
+        io.unobserve(el);
+        el.classList.add("in");
+        el.addEventListener("transitionend", function done(ev) {
+          if (ev.target !== el || ev.propertyName !== "transform") return;
+          el.removeEventListener("transitionend", done);
+          el.classList.remove("reveal", "in");
+          el.removeAttribute("data-reveal");
+          el.style.removeProperty("--d");
+        });
+      });
+    }, { rootMargin: "0px 0px -8% 0px" });
+
+    function reveal(sel, type, stagger) {
+      $$(sel).forEach(function (el, i) {
+        el.classList.add("reveal");
+        if (type) el.dataset.reveal = type;
+        if (stagger) el.style.setProperty("--d", i % 8);
+        io.observe(el);
+      });
+    }
+    $$(".section .head, .catalog-top .head").forEach(function (h) {
+      Array.prototype.slice.call(h.children).forEach(function (c, i) {
+        c.classList.add("reveal");
+        c.style.setProperty("--d", i);
+        io.observe(c);
+      });
+    });
+    reveal(".facts p");
+    reveal(".filters", "right");
+    reveal(".catalog .course-row", "", true);
+    reveal(".catalog-note");
+    reveal(".promo-box", "scale");
+    reveal(".gallery .tile", "scale", true);
+    reveal(".about-art", "left");
+    reveal(".about-text > h2, .about-text > p, .points li", "", true);
+    reveal(".teacher", "", true);
+    reveal(".testimonial", "", true);
+    reveal(".faq details", "", true);
+    reveal(".closing", "scale");
+    reveal(".contact-list li", "left", true);
+    reveal(".map", "right");
+    reveal(".footer-grid > div", "", true);
+    reveal(".perks li", "", true);
+    reveal(".course-body .block");
+    reveal(".places li, .modules li", "", true);
+    reveal(".enroll", "right");
+
+    if (!FINE) return;
+
+    // Parallax suave no hero
+    var art = $("#hero-art"), hero = $(".hero");
+    if (art && hero) {
+      var raf = 0;
+      hero.addEventListener("pointermove", function (e) {
+        if (raf) return;
+        raf = requestAnimationFrame(function () {
+          raf = 0;
+          var r = hero.getBoundingClientRect();
+          art.style.setProperty("--mx", ((e.clientX - r.left) / r.width - .5) * 2);
+          art.style.setProperty("--my", ((e.clientY - r.top) / r.height - .5) * 2);
+        });
+      });
+      hero.addEventListener("pointerleave", function () { art.style.setProperty("--mx", 0); art.style.setProperty("--my", 0); });
+    }
+
+    // Inclinação 3D nos cards da galeria
+    $$(".gallery .tile").forEach(function (t) {
+      t.addEventListener("pointermove", function (e) {
+        var r = t.getBoundingClientRect(), x = (e.clientX - r.left) / r.width, y = (e.clientY - r.top) / r.height;
+        t.style.setProperty("--ry", ((x - .5) * 8).toFixed(2) + "deg");
+        t.style.setProperty("--rx", ((.5 - y) * 8).toFixed(2) + "deg");
+        t.style.setProperty("--gx", (x * 100).toFixed(1) + "%");
+        t.style.setProperty("--gy", (y * 100).toFixed(1) + "%");
+      });
+      t.addEventListener("pointerleave", function () { t.style.setProperty("--rx", "0deg"); t.style.setProperty("--ry", "0deg"); });
+    });
+  }
+
   renderChrome();
   if (body.dataset.page === "home") renderHome();
   if (body.dataset.page === "curso") renderCurso();
+  motion();
 })();
